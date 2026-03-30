@@ -85,7 +85,7 @@ At the competition deadline, each group submits a **HuggingFace repository** con
    huggingface-cli login
    huggingface-cli upload your-username/cse251b-group-XX ./checkpoint.pt ./model.py ./config.json
    ```
-4. Submit your HuggingFace repo URL via [Gradescope / Google Form — PLACEHOLDER_LINK].
+4. Submit your HuggingFace repo URL via [Google Form](https://docs.google.com/forms/d/1DzFQxqUZ8s_Q5z8gdTF7c9fIvqOs1pT7ZU7EJ7FUo1U/edit).
 
 ### Required Model Interface
 
