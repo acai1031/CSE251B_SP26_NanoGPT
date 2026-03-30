@@ -60,8 +60,8 @@ Your final ranking is determined by perplexity on a **hidden test set** that is 
 
 During the competition, we maintain a live leaderboard based on **self-reported validation PPL**. Submit your latest score here:
 
-- **Submit scores:** [Google Form — PLACEHOLDER_LINK]
-- **View leaderboard:** [Google Sheet — PLACEHOLDER_LINK]
+- **Submit scores:** [Google Form](https://docs.google.com/forms/d/e/1FAIpQLSfeQBE13GvjqRClzZ3xxf6xq30qdbgeKHzn388N6f7uNtPQfQ/viewform?usp=dialog)
+- **View leaderboard:** [Google Sheet](https://docs.google.com/spreadsheets/d/18kUxd0P9kDn9KvsCtpZX2LkPrdMRZprwcQH9e-nWT7U/edit?resourcekey=&gid=2117603225#gid=2117603225)
 
 The public leaderboard is for motivation and fun. It does not determine your grade — only the hidden test set evaluation does.
 
