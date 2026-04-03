@@ -52,18 +52,28 @@ python evaluate.py --hf_repo your-username/cse251b-group-XX --data val.bin
 
 The `--hf_repo` mode downloads your model from HuggingFace and evaluates it in exactly the same way the TAs will. **Use this to verify your submission works before the deadline.**
 
+### Wall-Clock Time Limit
+
+Each submission is given a maximum of **5 minutes (300 seconds)** of wall-clock time to run inference on the evaluation split. This is measured from when your model is loaded until the final perplexity is computed — download time does not count. A standard 100M parameter model completes in roughly 50 seconds, so this limit is generous. Models that exceed the limit are disqualified from that evaluation run.
+
 ### Hidden Test Set
 
 Your final ranking is determined by perplexity on a **hidden test set** that is never released to students. The test set is drawn from the same distribution as the validation set. At the submission deadline, TAs will download your model and evaluate it against the hidden test set. The test set is a mix of domains designed to reward models that generalize well — not just models that memorize one particular data source.
 
-### Leaderboard
+### Leaderboards
 
-During the competition, we maintain a live leaderboard based on **self-reported validation PPL**. Submit your latest score here:
+There are three leaderboards. All use the same single submission link — see [Submission](#submission) below.
 
-- **Submit scores:** [Google Form](https://docs.google.com/forms/d/e/1FAIpQLSfeQBE13GvjqRClzZ3xxf6xq30qdbgeKHzn388N6f7uNtPQfQ/viewform?usp=dialog)
-- **View leaderboard:** [Google Sheet](https://docs.google.com/spreadsheets/d/18kUxd0P9kDn9KvsCtpZX2LkPrdMRZprwcQH9e-nWT7U/edit?resourcekey=&gid=2117603225#gid=2117603225)
+| Leaderboard | Split | Source | Purpose |
+|---|---|---|---|
+| **Unofficial (Val)** | Public val | Self-reported PPL | High-frequency, for fun — not used for grades |
+| **Official (Val)** | Public val | TA-run eval, weekly | Tracks progress; not used for grades |
+| **Official (Test)** | Hidden test | TA-run eval, after May 31 | Determines contest ranking and grade |
 
-The public leaderboard is for motivation and fun. It does not determine your grade — only the hidden test set evaluation does.
+- **View unofficial leaderboard:** [Google Sheet](https://docs.google.com/spreadsheets/d/1mDsizxbzSE6RirQ-WyFqZfj5uvNRPpmZsg7sggsylfU/edit?usp=sharing) (self-reported, updated whenever you submit)
+- **View official leaderboard:** [GitHub Pages site](https://matt-seb-ho.github.io/cse251b-nanogpt-contest-public/) (TA-run, updated weekly)
+
+The unofficial leaderboard is for motivation and frequent self-tracking. Only the hidden test set evaluation after the submission deadline determines your grade.
 
 ## Submission
 
@@ -77,15 +87,23 @@ At the competition deadline, each group submits a **HuggingFace repository** con
 
 ### How to Submit
 
+There is a **single submission form** for everything — registering your team, joining the leaderboards, and submitting your final model. Fill it out once and update it as needed.
+
+**[→ Submit here](https://forms.gle/p99o5vr26DLdY1X47)**
+
+The form asks for: team name, member info, HuggingFace model repo ID, and an optional self-reported val PPL for the unofficial leaderboard.
+
 1. Create a free account on [huggingface.co](https://huggingface.co) if you don't have one.
-2. Create a new model repository (can be private — just add the TA team as collaborators).
+2. Create a **public** HuggingFace model repository. (Public is strongly preferred — private repos require adding the TA team as collaborators, which creates extra overhead. See note below.)
 3. Upload your files:
    ```bash
    pip install huggingface_hub
    huggingface-cli login
    huggingface-cli upload your-username/cse251b-group-XX ./checkpoint.pt ./model.py ./config.json
    ```
-4. Submit your HuggingFace repo URL via [Google Form](https://docs.google.com/forms/d/1DzFQxqUZ8s_Q5z8gdTF7c9fIvqOs1pT7ZU7EJ7FUo1U/edit).
+4. Fill out the submission form with your repo ID.
+
+> **Private repo?** If you must keep your repo private, add the TA team as collaborators before the evaluation deadline. Our HuggingFace usernames are `msho` and `alexnrojas5`. See the [HuggingFace docs](https://huggingface.co/docs/hub/organizations-managing) for instructions.
 
 ### Required Model Interface
 
