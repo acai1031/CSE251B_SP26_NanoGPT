@@ -2,8 +2,8 @@ import glob
 import numpy as np
 from pathlib import Path
 
-src = Path("./external/build-nanogpt/edu_fineweb10B")
-dst = Path("./external/nanoGPT/data/fineweb")
+src = Path("./data/edu_fineweb10B")
+dst = Path("./data/fineweb")
 dst.mkdir(parents=True, exist_ok=True)
 
 def write_bin(pattern, out_file, max_shards=None):
