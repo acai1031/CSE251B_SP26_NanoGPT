@@ -206,3 +206,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 data/
+
+checkpoints/
+*.pt
+*.bin
+data/
+external/
+__pycache__/
+
