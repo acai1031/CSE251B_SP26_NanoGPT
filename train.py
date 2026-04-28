@@ -52,7 +52,7 @@ block_size = 1024
 n_layer = 12
 n_head = 12
 n_embd = 768
-dropout = 0.0 # for pretraining 0 is good, for finetuning try 0.1+
+dropout = 0 # for pretraining 0 is good, for finetuning try 0.1+
 bias = False # do we use bias inside LayerNorm and Linear layers?
 # adamw optimizer
 learning_rate = 6e-4 # max learning rate
@@ -262,7 +262,13 @@ while True:
     # evaluate the loss on train/val sets and write checkpoints
     if iter_num % eval_interval == 0 and master_process:
         losses = estimate_loss()
-        print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        log_str = f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
+        print(log_str)
+    
+        # log
+        with open(os.path.join(out_dir, "log.txt"), "a") as f:
+            f.write(log_str + "\n")
+        
         if wandb_log:
             wandb.log({
                 "iter": iter_num,
@@ -271,6 +277,7 @@ while True:
                 "lr": lr,
                 "mfu": running_mfu*100, # convert to percentage
             })
+
         if losses['val'] < best_val_loss or always_save_checkpoint:
             best_val_loss = losses['val']
             if iter_num > 0:
