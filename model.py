@@ -350,22 +350,55 @@ class GPT(nn.Module):
         return idx
 
 
+# def load_model(checkpoint_path: str, device: str = "cuda") -> torch.nn.Module:
+#     """
+#     Load your trained model from a checkpoint.
+
+#     Returns:
+#         model(input_ids) -> logits
+#         logits shape: (B, T, 50257)
+#     """
+
+#     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+
+#     model_args = checkpoint["model_args"]
+#     config = GPTConfig(**model_args)
+#     model = GPT(config)
+
+#     model.load_state_dict(checkpoint["model"])
+
+#     model.to(device)
+#     model.eval()
+
+#     class WrappedModel(nn.Module):
+#         def __init__(self, model):
+#             super().__init__()
+#             self.model = model
+
+#         def forward(self, input_ids):
+#             logits, _ = self.model(input_ids)
+#             return logits[:, :, :50257]
+
+#     return WrappedModel(model)
+
+
 def load_model(checkpoint_path: str, device: str = "cuda") -> torch.nn.Module:
-    """
-    Load your trained model from a checkpoint.
-
-    Returns:
-        model(input_ids) -> logits
-        logits shape: (B, T, 50257)
-    """
-
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+
+    def clean_state_dict(sd):
+        new_sd = {}
+        for k, v in sd.items():
+            if k.startswith("_orig_mod."):
+                k = k[len("_orig_mod."):]
+            new_sd[k] = v
+        return new_sd
 
     model_args = checkpoint["model_args"]
     config = GPTConfig(**model_args)
     model = GPT(config)
 
-    model.load_state_dict(checkpoint["model"])
+    state_dict = clean_state_dict(checkpoint["model"])
+    model.load_state_dict(state_dict)
 
     model.to(device)
     model.eval()
