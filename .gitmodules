@@ -1,6 +1,0 @@
-[submodule "external/nanoGPT"]
-	path = external/nanoGPT
-	url = https://github.com/karpathy/nanoGPT.git
-[submodule "external/build-nanogpt"]
-	path = external/build-nanogpt
-	url = https://github.com/karpathy/build-nanogpt.git
