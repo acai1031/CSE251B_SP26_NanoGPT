@@ -211,6 +211,6 @@ checkpoints/
 *.pt
 *.bin
 data/
-external/
+# external/
 __pycache__/
 
