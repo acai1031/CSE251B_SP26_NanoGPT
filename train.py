@@ -46,7 +46,7 @@ wandb_run_name = 'gpt2' # 'run' + str(time.time())
 # data
 dataset = 'openwebtext'
 gradient_accumulation_steps = 5 * 8 # used to simulate larger batch sizes
-batch_size = 12 # if gradient_accumulation_steps > 1, this is the micro-batch size
+batch_size = 16 # if gradient_accumulation_steps > 1, this is the micro-batch size
 block_size = 1024
 # model
 n_layer = 12
@@ -57,14 +57,14 @@ bias = False # do we use bias inside LayerNorm and Linear layers?
 # adamw optimizer
 learning_rate = 6e-4 # max learning rate
 max_iters = 600000 # total number of training iterations
-weight_decay = 1e-1
+weight_decay = 0.1
 beta1 = 0.9
 beta2 = 0.95
 grad_clip = 1.0 # clip gradients at this value, or disable if == 0.0
 # learning rate decay settings
 decay_lr = True # whether to decay the learning rate
-warmup_iters = 2000 # how many steps to warm up for
-lr_decay_iters = 600000 # should be ~= max_iters per Chinchilla
+warmup_iters = 500 # how many steps to warm up for
+lr_decay_iters = 5000 # should be ~= max_iters per Chinchilla
 min_lr = 6e-5 # minimum learning rate, should be ~= learning_rate/10 per Chinchilla
 # DDP settings
 backend = 'nccl' # 'nccl', 'gloo', etc.
@@ -195,8 +195,31 @@ model.to(device)
 # initialize a GradScaler. If enabled=False scaler is a no-op
 scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
 
-# optimizer
-optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device_type)
+# adam optimizer
+# optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device_type)
+
+# muon optimizer
+from muon import Muon
+muon_params = []
+adamw_params = []
+for name, param in model.named_parameters():
+    if not param.requires_grad:
+        continue
+    if param.ndim == 2 and 'wte' not in name and 'wpe' not in name and 'lm_head' not in name:
+        muon_params.append(param)
+    else:
+        adamw_params.append(param)
+
+optimizer = Muon(
+    muon_params=muon_params,
+    lr=0.02,
+    momentum=0.95,
+    adamw_params=adamw_params,
+    adamw_lr=learning_rate,
+    adamw_betas=(beta1, beta2),
+    adamw_wd=weight_decay,
+)
+
 if init_from == 'resume':
     optimizer.load_state_dict(checkpoint['optimizer'])
 checkpoint = None # free up memory
