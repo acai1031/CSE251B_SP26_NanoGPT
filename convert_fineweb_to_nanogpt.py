@@ -2,7 +2,7 @@ import glob
 import numpy as np
 from pathlib import Path
 
-src = Path("./data/edu_fineweb10B")
+src = Path("./external/build-nanogpt/data/edu_fineweb10B")
 dst = Path("./data/fineweb")
 dst.mkdir(parents=True, exist_ok=True)
 
