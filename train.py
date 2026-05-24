@@ -196,7 +196,28 @@ model.to(device)
 scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
 
 # optimizer
-optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device_type)
+# optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device_type)
+#muon
+from muon import Muon
+muon_params = []
+adamw_params = []
+for name, param in model.named_parameters():
+    if not param.requires_grad:
+        continue
+    if param.ndim == 2 and 'wte' not in name and 'wpe' not in name and 'lm_head' not in name:
+        muon_params.append(param)
+    else:
+        adamw_params.append(param)
+
+optimizer = Muon(
+    muon_params=muon_params,
+    lr=0.02,
+    momentum=0.95,
+    adamw_params=adamw_params,
+    adamw_lr=learning_rate,
+    adamw_betas=(beta1, beta2),
+    adamw_wd=weight_decay,
+)
 if init_from == 'resume':
     optimizer.load_state_dict(checkpoint['optimizer'])
 checkpoint = None # free up memory
@@ -228,19 +249,30 @@ def estimate_loss():
     return out
 
 # learning rate decay scheduler (cosine with warmup)
-def get_lr(it):
-    # 1) linear warmup for warmup_iters steps
-    if it < warmup_iters:
-        return learning_rate * (it + 1) / (warmup_iters + 1)
-    # 2) if it > lr_decay_iters, return min learning rate
-    if it > lr_decay_iters:
-        return min_lr
-    # 3) in between, use cosine decay down to min learning rate
-    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
-    assert 0 <= decay_ratio <= 1
-    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
-    return min_lr + coeff * (learning_rate - min_lr)
+# def get_lr(it):
+#     # 1) linear warmup for warmup_iters steps
+#     if it < warmup_iters:
+#         return learning_rate * (it + 1) / (warmup_iters + 1)
+#     # 2) if it > lr_decay_iters, return min learning rate
+#     if it > lr_decay_iters:
+#         return min_lr
+#     # 3) in between, use cosine decay down to min learning rate
+#     decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
+#     assert 0 <= decay_ratio <= 1
+#     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
+#     return min_lr + coeff * (learning_rate - min_lr)
 
+def get_lr(it):
+    # 1) linear warmup
+    if it < warmup_iters:
+        return learning_rate * it / warmup_iters
+    # 2) flat top — stay at max lr for 80% of training
+    if it < max_iters * 0.8:
+        return learning_rate
+    # 3) fast linear decay in final 20%
+    decay = (max_iters - it) / (max_iters * 0.2)
+    return max(learning_rate * decay, min_lr)
+    
 # logging
 if wandb_log and master_process:
     import wandb

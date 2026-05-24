@@ -2,3 +2,5 @@ step 0: train loss 10.8529, val loss 10.8498
 step 0: train loss 10.8529, val loss 10.8498
 step 25: train loss 10.6630, val loss 10.6630
 step 50: train loss 10.2654, val loss 10.2717
+step 0: train loss 10.8227, val loss 10.8190
+step 25: train loss 10.5444, val loss 10.5450
