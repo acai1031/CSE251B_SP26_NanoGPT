@@ -41,6 +41,15 @@ class CausalSelfAttention(nn.Module):
         self.n_head = config.n_head
         self.n_embd = config.n_embd
         self.dropout = config.dropout
+        self.head_size = config.n_embd // config.n_head
+        # RoPE: precompute cos/sin frequencies
+        theta = 1.0 / (10000 ** (torch.arange(0, self.head_size, 2).float() / self.head_size))
+        pos = torch.arange(config.block_size).float()
+        freqs = torch.outer(pos, theta)
+        cos = torch.cat([freqs.cos(), freqs.cos()], dim=-1).unsqueeze(0).unsqueeze(0)
+        sin = torch.cat([freqs.sin(), freqs.sin()], dim=-1).unsqueeze(0).unsqueeze(0)
+        self.register_buffer("rope_cos", cos)
+        self.register_buffer("rope_sin", sin)
         # flash attention make GPU go brrrrr but support is only in PyTorch >= 2.0
         self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
         if not self.flash:
@@ -58,6 +67,12 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
 
+        # apply RoPE to q and k
+        def rotate_half(x):
+            h = x.shape[-1] // 2
+            return torch.cat([-x[..., h:], x[..., :h]], dim=-1)
+        q = q * self.rope_cos[:,:,:T,:] + rotate_half(q) * self.rope_sin[:,:,:T,:]
+        k = k * self.rope_cos[:,:,:T,:] + rotate_half(k) * self.rope_sin[:,:,:T,:]
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
             # efficient attention using Flash Attention CUDA kernels
@@ -75,18 +90,34 @@ class CausalSelfAttention(nn.Module):
         y = self.resid_dropout(self.c_proj(y))
         return y
 
+# class MLP(nn.Module):
+
+#     def __init__(self, config):
+#         super().__init__()
+#         self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
+#         self.gelu    = nn.GELU()
+#         self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
+#         self.dropout = nn.Dropout(config.dropout)
+
+#     def forward(self, x):
+#         x = self.c_fc(x)
+#         x = self.gelu(x)
+#         x = self.c_proj(x)
+#         x = self.dropout(x)
+#         return x
+
 class MLP(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
-        self.gelu    = nn.GELU()
-        self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
+        hidden_dim = int(4 * config.n_embd * 2 / 3)  # SwiGLU: 8/3 * n_embd, keeps param count ~same
+        self.c_fc   = nn.Linear(config.n_embd, hidden_dim, bias=config.bias)
+        self.c_gate = nn.Linear(config.n_embd, hidden_dim, bias=config.bias)
+        self.c_proj = nn.Linear(hidden_dim, config.n_embd, bias=config.bias)
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
-        x = self.c_fc(x)
-        x = self.gelu(x)
+        x = F.silu(self.c_fc(x)) * self.c_gate(x)
         x = self.c_proj(x)
         x = self.dropout(x)
         return x
@@ -114,6 +145,7 @@ class GPTConfig:
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    n_future: int = 1  # multi-token prediction: predict next n_future tokens
 
 class GPT(nn.Module):
 
@@ -125,7 +157,6 @@ class GPT(nn.Module):
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.n_embd),
-            wpe = nn.Embedding(config.block_size, config.n_embd),
             drop = nn.Dropout(config.dropout),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
@@ -136,6 +167,14 @@ class GPT(nn.Module):
         # This behavior is deprecated and will be an error in future versions"
         # not 100% sure what this is, so far seems to be harmless. TODO investigate
         self.transformer.wte.weight = self.lm_head.weight # https://paperswithcode.com/method/weight-tying
+        # multi-token prediction: small projection heads for future tokens (shared lm_head)
+        if config.n_future > 1:
+            self.future_proj = nn.ModuleList([
+                nn.Linear(config.n_embd, config.n_embd, bias=False)
+                for _ in range(config.n_future - 1)
+            ])
+        else:
+            self.future_proj = nn.ModuleList()
 
         # init all weights
         self.apply(self._init_weights)
@@ -156,7 +195,7 @@ class GPT(nn.Module):
         """
         n_params = sum(p.numel() for p in self.parameters())
         if non_embedding:
-            n_params -= self.transformer.wpe.weight.numel()
+            pass  # RoPE: no wpe, positional encoding is in attention
         return n_params
 
     def _init_weights(self, module):
@@ -200,8 +239,7 @@ class GPT(nn.Module):
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
-        pos_emb = self.transformer.wpe(pos) # position embeddings of shape (t, n_embd)
-        x = self.transformer.drop(tok_emb + pos_emb)
+        x = self.transformer.drop(tok_emb)  # RoPE: no positional embedding
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.ln_f(x)
@@ -218,7 +256,6 @@ class GPT(nn.Module):
         # but want to use a smaller block size for some smaller, simpler model
         assert block_size <= self.config.block_size
         self.config.block_size = block_size
-        self.transformer.wpe.weight = nn.Parameter(self.transformer.wpe.weight[:block_size])
         for block in self.transformer.h:
             if hasattr(block.attn, 'bias'):
                 block.attn.bias = block.attn.bias[:,:,:block_size,:block_size]
